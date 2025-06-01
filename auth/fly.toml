@@ -1,0 +1,17 @@
+# fly.toml app configuration file
+app = "aiflo-auth"  # Replace with your desired app name
+primary_region = "ams"  # Replace with your preferred region
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 8080  # Adjust to match your app's port
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
