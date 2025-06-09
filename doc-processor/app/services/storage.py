@@ -89,9 +89,8 @@ class Storage:
 
             urls.append({
                 "filename": f"{file_name}",
-                "s3_key": s3_key,
-                "upload_url": presigned_url,
-                "public_url": f"https://{bucket}.s3.amazonaws.com/{s3_key}"
+                "path": s3_key,
+                "uploadURL": presigned_url
             })
 
         return {"urls": urls}
