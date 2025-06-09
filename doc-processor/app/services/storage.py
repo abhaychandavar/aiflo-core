@@ -93,4 +93,4 @@ class Storage:
                 "uploadURL": presigned_url
             })
 
-        return {"urls": urls}
+        return urls
