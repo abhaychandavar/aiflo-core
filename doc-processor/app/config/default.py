@@ -7,8 +7,8 @@ class Settings():
     VERSION="0.0.1"
     PORT=int(os.getenv("PORT", "8083"))
     HOST=os.getenv("HOST", "localhost")
-    ALLOWED_ORIGINS=os.getenv("ALLOWED_ORIGINS"),
-    ENV=os.getenv("ENV", "local"),
+    ALLOWED_ORIGINS=os.getenv("ALLOWED_ORIGINS")
+    ENV=os.getenv("ENV", "local")
     LOG_LEVEL=logging.DEBUG
     JWT_SECRET_KEY=os.getenv("JWT_SECRET_KEY", "ALJSDh32re3rR#$RTEw(&*(rhe))")
     INTERNAL_SECRET_KEY=os.getenv("INTERNAL_SECRET_KEY", "secretKey")

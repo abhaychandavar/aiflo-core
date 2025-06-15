@@ -21,6 +21,8 @@ async def validate_internal_access(request: Request):
 
 async def validate_user_access(request: Request):
     try:
+        if request.method == "OPTIONS":
+            return
         token = request.headers.get('Authorization')
         if not token or 'Bearer' not in token:
             raise APP_ERROR(status_code=StatusCode.UNAUTHORIZED, code='app/invalid-auth-token', message='Invalid authorization header')
