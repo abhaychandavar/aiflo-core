@@ -63,7 +63,7 @@ class Quadrant:
             
             points.append(point)
 
-            if len(points) >= 50:
+            if len(points) >= 10:
                 self.client.upsert(collection_name=mode, points=points)
                 points = []
 

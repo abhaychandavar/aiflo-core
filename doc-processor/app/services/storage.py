@@ -94,3 +94,30 @@ class Storage:
             })
 
         return urls
+
+    def get_folder_size(self, bucket, prefix):
+        total_size = 0
+        continuation_token = None
+
+        while True:
+            if continuation_token:
+                response = self._client.list_objects_v2(
+                    Bucket=bucket,
+                    Prefix=prefix,
+                    ContinuationToken=continuation_token
+                )
+            else:
+                response = self._client.list_objects_v2(
+                    Bucket=bucket,
+                    Prefix=prefix
+                )
+
+            for obj in response.get("Contents", []):
+                total_size += obj["Size"]
+
+            if response.get("IsTruncated"):
+                continuation_token = response.get("NextContinuationToken")
+            else:
+                break
+
+        return total_size

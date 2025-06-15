@@ -1,4 +1,4 @@
-from datetime import datetime
+import datetime
 from app.services.flowService import get_node_by_id
 from app.utils.db.models.knowledgebase import KnowledgeBase
 from app.utils.db.models.user import Users
@@ -127,10 +127,9 @@ async def index_pdf(data, mode, max_characters):
     return True
 
 async def _handle_process_document(body):
-    flow_id = body.get("flowID")
-    node_id = body.get("nodeID")
+    id = body.get("id")
 
-    knowledge_base = KnowledgeBase.objects(flowID=flow_id, nodeID=node_id).first()
+    knowledge_base = KnowledgeBase.objects(id=ObjectId(id)).first()
     if not knowledge_base:
         raise APP_ERROR(code="doc-processor/not-found/knowledge-base", status_code=StatusCode.NOT_FOUND, message="Knowledge base not found")
 
@@ -138,7 +137,7 @@ async def _handle_process_document(body):
 
     path = knowledge_base_dict.get("path")
     
-    node = get_node_by_id(node_id=node_id, flow_id=flow_id)
+    node = await get_node_by_id(node_id=knowledge_base_dict.get("nodeID"), flow_id=knowledge_base_dict.get("flowID"))
 
     max_characters = node.get("data", {}).get("config", {}).get("max_characters", 14000)
     mode = node.get("data", {}).get("config", {}).get("mode", "semantic")
@@ -149,9 +148,10 @@ async def _handle_process_document(body):
         mode=mode
     )
 
-    KnowledgeBase.objects(flowID=flow_id, nodeID=node_id).modify(
-        __set__processedAt=datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None),
-        new=True
+    KnowledgeBase.objects(id=ObjectId(knowledge_base_dict.get("_id"))).modify(
+        set__processedAt=datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None),
+        new=True,
+        upsert=True
     )
 
 async def handle_event(message):

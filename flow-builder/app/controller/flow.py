@@ -61,23 +61,6 @@ async def delete_flow(flowID: str):
     delete_res = Flows.objects(id=ObjectId(flowID)).delete()
     return delete_res
 
-async def save_knowledge_base(flow_id: str, node_id: str, path: str):
-    flow = Flows.objects(id=ObjectId(flow_id)).first()
-    if not flow:
-        raise APP_ERROR(code=StatusCode.NOT_FOUND, message="Flow not found")
-    flow_dict = flow.to_dict()
-    node = next((n for n in flow_dict.get("flow", {}).get("nodes", []) if n.get("id") == node_id), None)
-    if not node:
-        raise APP_ERROR(code=StatusCode.NOT_FOUND, message=f"Node with id {node_id} not found")
-    
-    res = KnowledgeBase.objects(nodeID=node.get("id"), flowID=flow.get("id")).modify(
-        set__path=path,
-        set__isProcessed=False,
-        upsert=True,
-        new=True
-    )
-    return res.to_dict()
-
 async def run_flow(flowID: str, data: dict):
     flow = Flows.objects(id=ObjectId(flowID)).first()
 

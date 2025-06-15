@@ -1,5 +1,4 @@
 from fastapi import APIRouter
-from fastapi import APIRouter
 from fastapi import Request
 from app.controller.docProcessor import index_doc, handle_event
 from app.utils.api import api_helpers 

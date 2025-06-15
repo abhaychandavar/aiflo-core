@@ -12,7 +12,7 @@ class StatusEnum(Enum):
 
 class Flows(CustomDocument):
     user = ReferenceField(Users, required=True)
-    name = StringField(required=True, unique=True)
+    name = StringField(required=True)
     description = StringField()
     flow = DictField()
     status = EnumField(StatusEnum, required=True, default=StatusEnum.UNPUBLISHED)

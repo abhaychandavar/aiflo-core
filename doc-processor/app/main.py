@@ -26,8 +26,8 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     
-    print("SETTINGS ENV", Settings.ENV)
-    if Settings.ENV == "local":
+    print("SETTINGS ENV", Settings.ENV[0])
+    if Settings.ENV[0] == "local":
         app.add_middleware(
             CORSMiddleware,
             allow_origins=[
