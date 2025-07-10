@@ -4,7 +4,7 @@ import datetime
 from app.utils.parser import mongo_to_dict
 from app.utils.db.helpers.customDocument import CustomDocument
 class AuthMethods(Enum):
-    EMAIL_PASS = "email-pass", 
+    EMAIL_PASS = "email-pass"
     GOOGLE_AUTH = "google-oauth"
 class Users(CustomDocument):
     name = StringField()

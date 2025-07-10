@@ -7,6 +7,7 @@ from app.utils.crypto import hash_password
 from app.utils.api import APP_ERROR, StatusCode
 from app.utils.jwt import create_jwt_token, create_refresh_token
 from app.utils.db.models.refreshToken import RefreshTokens
+from app.controller.space import create_space, does_user_space_exist
 
 async def handle_auth(email: str, method: str, name: Optional[str], imageURL: Optional[str], password: Optional[str]):
     if not password:
@@ -38,11 +39,15 @@ async def handle_auth(email: str, method: str, name: Optional[str], imageURL: Op
     refresh_token = create_refresh_token()
 
     refresh_token_obj = RefreshTokens(
-        user = ObjectId(user_dict["_id"]),
+        user = ObjectId(user_dict["id"]),
         token = refresh_token,
     )
     refresh_token_obj.save();
     
+    space = does_user_space_exist(user_id=user_dict["id"])
+    if not space:
+        create_space(user=user_dict, name="My space")
+
     return {
         "accessToken": access_token,
         "refreshToken": refresh_token,

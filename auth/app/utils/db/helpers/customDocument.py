@@ -5,7 +5,7 @@ class CustomDocument(Document):
     meta = {
         'abstract': True
     }
-    def to_dict(self):
-        return mongo_to_dict(self.to_mongo())
+    def to_dict(self, ignore_fields=[]):
+        return mongo_to_dict(self, ignore_fields)
     
     

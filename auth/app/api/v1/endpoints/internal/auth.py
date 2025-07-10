@@ -11,7 +11,7 @@ router = APIRouter()
 async def authenticate(request: Request):
     try:
         body = await request.json();
-        res = await handle_auth(email = body.get('email'), method = body.get('method'), name = body.get('name'), imageURL = body.get('imageURL'), password = body.get('password'));
+        res = await handle_auth(email = body.get('email'), method = body.get('method'), name = body.get('name', body.get('email')), imageURL = body.get('imageURL'), password = body.get('password'));
         return api_helpers.response_handler(res)
     except (Exception, APP_ERROR) as e:
         print("error", e)

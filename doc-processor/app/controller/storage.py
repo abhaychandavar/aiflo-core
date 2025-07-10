@@ -11,19 +11,11 @@ from app.utils.db.models.knowledgebase import KnowledgeBase, KnowledgeBaseType
 from app.providers.communications.qstash import QSTASH_PROVIDER
 import base64
 
-async def generate_sequential_upload_signed_urls(flow_id, node_id, file_name, count):
-    id_details = get_file_ref_id(flow_id=flow_id, node_id=node_id, file_name=file_name)
+async def generate_sequential_upload_signed_urls(space_id, file_name, count):
+    id_details = get_file_ref_id(space_id=space_id, file_name=file_name)
     id = id_details["id"]
 
-    node = await get_node_by_id(flow_id=flow_id, node_id=node_id)
-    if not node:
-        raise APP_ERROR(
-                status_code=StatusCode.BAD_REQUEST, 
-                code="docProcessor/invalid/flow-or-node/id",
-                message="Flow ID or node ID is incorrect"
-            )
-    
-    file_essentials = generate_file_essentials(flow_id=flow_id, node_id=node_id, file_name=file_name, id=id)
+    file_essentials = generate_file_essentials(space_id=space_id, file_name=file_name, id=id)
     prefix = file_essentials["prefix"]
 
     storage_instance = Storage()
@@ -39,26 +31,18 @@ async def generate_sequential_upload_signed_urls(flow_id, node_id, file_name, co
 
     return { "id": id, "presignedURLs": signed_urls }
 
-async def complete_upload(flow_id, node_id, file_name):
-    id_details = get_file_ref_id(flow_id=flow_id, node_id=node_id, file_name=file_name)
+async def complete_upload(space_id: str, file_name):
+    id_details = get_file_ref_id(space_id=space_id, file_name=file_name)
     id = id_details["id"]
 
-    node = await get_node_by_id(flow_id=flow_id, node_id=node_id)
-    if not node:
-        raise APP_ERROR(
-                status_code=StatusCode.BAD_REQUEST, 
-                code="docProcessor/invalid/flow-or-node/id",
-                message="Flow ID or node ID is is incorrect"
-            )
-    
-    file_essentials = generate_file_essentials(flow_id=flow_id, node_id=node_id, file_name=file_name, id=id)
+    file_essentials = generate_file_essentials(space_id=space_id, file_name=file_name, id=id)
     prefix = file_essentials["prefix"]
     
     bucket = Constants.S3.BUCKETS.AIFLO_PUBLIC
     storage = Storage()
     size = storage.get_folder_size(bucket=bucket, prefix=prefix)
 
-    upserted_doc = KnowledgeBase.objects(flowID=flow_id, nodeID=node_id, refID=id).modify(
+    upserted_doc = KnowledgeBase.objects(spaceID=space_id, refID=id).modify(
         set__path=prefix,
         set__key = id_details["key"],
         set__uploadedAt = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None),
@@ -90,8 +74,8 @@ async def complete_upload(flow_id, node_id, file_name):
 
     return upserted_dict
 
-def get_file_ref_id(flow_id: str, node_id: str, file_name: str):
-    id = f"{flow_id}{node_id}{base64.b64encode(file_name.encode("utf-8"))}"
+def get_file_ref_id(space_id: str, file_name: str):
+    id = f"{space_id}{base64.b64encode(file_name.encode("utf-8"))}"
     existing_knowledge_base = KnowledgeBase.objects(key=id).order_by("-refID").first()
     if existing_knowledge_base:
         existing_knowledge_base_dict = existing_knowledge_base.to_dict()
@@ -106,15 +90,15 @@ def get_file_ref_id(flow_id: str, node_id: str, file_name: str):
             "key": id
         }
 
-def generate_file_essentials(flow_id: str, node_id: str, file_name: str, id: str):
+def generate_file_essentials(space_id: str, file_name: str, id: str):
     file_base_name = os.path.basename(file_name)
     file_ext = os.path.splitext(file_base_name)[1].lower()
     file_name = os.path.splitext(file_base_name)[0].lower()
     return {
-        "prefix": f"{flow_id}/{node_id}/{id}/{file_name}-{file_ext.split(".")[1]}",
+        "prefix": f"{space_id}/{id}/{file_name}-{file_ext.split(".")[1]}",
         "fileExt": file_ext,
     }
 
-async def get_files(flow_id, node_id):
-    files = KnowledgeBase.objects(flowID=flow_id, nodeID=node_id)
+async def get_files(space_id: str):
+    files = KnowledgeBase.objects(spaceID=space_id)
     return [file.to_dict() for file in files]

@@ -4,6 +4,6 @@ flow_router = APIRouter()
 
 flow_router.include_router(
     router=flow.router,
-    prefix='/flows',
+    prefix='/projects',
     tags=["flow"]
 )

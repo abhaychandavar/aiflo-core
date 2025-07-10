@@ -24,7 +24,7 @@ from app.providers.embeddings.openAIEmbeddings import OpenAIEmbeddings
 from app.providers.embeddings.fastEmbedEmbeddings import FastEmbeddings
 from app.types.splitMode import SplitMode
 
-async def index_doc(doc_path: str, mode: str, max_characters: int):
+async def index_doc(doc_path: str, mode: str, max_characters: int, metadata: dict):
     bucket = Constants.S3.BUCKETS.AIFLO_PUBLIC
     storage_instance = Storage()
     all_folder_keys = storage_instance.get_sorted_file_keys(bucket, doc_path)
@@ -34,10 +34,9 @@ async def index_doc(doc_path: str, mode: str, max_characters: int):
             file_ext = os.path.splitext(file_name)[1].lower()
             print(f"Processing file: {key}")
             file_data = storage_instance.get_file(bucket, key)
-            
             match file_ext:
                 case '.pdf':
-                    await index_pdf(file_data, mode, max_characters=max_characters)
+                    await index_pdf(file_data, mode, max_characters=max_characters, additional_metadata=metadata)
                     pass
                 case '.txt':
                     # process_text(file_data)
@@ -102,18 +101,19 @@ async def index_text(text_documents: List[TextDocument], mode, max_characters):
 
     return True
 
-async def index_pdf(data, mode, max_characters):
+async def index_pdf(data, mode, max_characters, additional_metadata):
     extracted_data_list = await get_pdf_bytes_as_markdown_text(data)
     print(extracted_data_list)
     extracted_docs = []
     for data in extracted_data_list:
-        metadata = data.get("metadata")
+        metadata = data.get("metadata", {})
         format = metadata.get("format")
         page = metadata.get("page")
         text = data.get("text")
 
         page_data: TextDocument = {
             "metadata": {
+                **(additional_metadata or {}),
                 "page": page,
                 "format": format
             },
@@ -137,15 +137,19 @@ async def _handle_process_document(body):
 
     path = knowledge_base_dict.get("path")
     
-    node = await get_node_by_id(node_id=knowledge_base_dict.get("nodeID"), flow_id=knowledge_base_dict.get("flowID"))
+    node = await get_node_by_id(node_id=body.get("nodeID"), flow_id=body.get("flowID"))
 
-    max_characters = node.get("data", {}).get("config", {}).get("max_characters", 14000)
-    mode = node.get("data", {}).get("config", {}).get("mode", "semantic")
+    max_characters = 14000 #TODO get max characters from knowledgeBase
+    mode = "hybrid" #TODO get mode from knowledgeBase
 
     await index_doc(
         doc_path=path,
         max_characters=max_characters,
-        mode=mode
+        mode=mode,
+        metadata={
+            "spaceID": knowledge_base_dict.get("spaceID"),
+            "refID": knowledge_base_dict.get("refID")
+        }
     )
 
     KnowledgeBase.objects(id=ObjectId(knowledge_base_dict.get("_id"))).modify(

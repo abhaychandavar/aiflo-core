@@ -14,16 +14,17 @@ class StatusCode():
     SOMETHING_WENT_WRONG=500
 
 class APP_ERROR(Exception):
-    def __init__(self, *args, code: str, status_code: StatusCode, message: str):
+    def __init__(self, *args, code: str, status_code: StatusCode, message: str, ui_message: str = None):
         self.code = code
         self.status_code = status_code
         self.message = message
-
+        self.ui_message = ui_message
+        
         super().__init__(*args)
 
 class API_HELPERS:
     @staticmethod
-    def response_handler(data: Optional[DICT], error: Optional[APP_ERROR | Exception] = None, streamResponse = False):
+    def response_handler(data: Optional[DICT], error: Optional[APP_ERROR | Exception] = None):
         if error:
             logging.error(f"Error occurred while processing request: {str(error)}")
             if isinstance(error, APP_ERROR):
@@ -32,7 +33,8 @@ class API_HELPERS:
                     detail={
                         "code": error.code,
                         "data": data if data else {},
-                        "message": error.message
+                        "message": error.message,
+                        "uiMessage": error.ui_message
                     }
                 )
             raise HTTPException(

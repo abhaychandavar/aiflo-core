@@ -12,5 +12,6 @@ class Settings():
     LOG_LEVEL=logging.DEBUG
     JWT_SECRET_KEY=os.getenv("JWT_SECRET_KEY", "ALJSDh32re3rR#$RTEw(&*(rhe))")
     INTERNAL_SECRET_KEY=os.getenv("INTERNAL_SECRET_KEY", "secretKey")
+    RESEND_API_KEY=os.getenv("RESEND_API_KEY")
 
 settings = Settings()

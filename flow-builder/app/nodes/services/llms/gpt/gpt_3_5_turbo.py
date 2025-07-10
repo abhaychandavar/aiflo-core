@@ -74,12 +74,12 @@ class GPT_3_5_Turbo(Node):
 
         return extractor()
     
-    async def execute(self, input: str, stream_data = False) -> AsyncGenerator[NodeServiceExecutionResultType, None]:
+    async def execute(self, instruction: str, prompt: str, stream_data = False) -> AsyncGenerator[NodeServiceExecutionResultType, None]:
         execution_id = str(uuid.uuid4())
         if stream_data:
             id = execution_id+"out-"
             idx = 1
-            async for chunk in self.__make_streaming_query(input):
+            async for chunk in self.__make_streaming_query(instruction, prompt):
                 extracted_data = self.extract_data_from_gpt_response(id+str(idx), chunk)
                 if not extracted_data:
                     continue
@@ -87,23 +87,42 @@ class GPT_3_5_Turbo(Node):
                 idx += 1
             return;
     
-        res = await self.__query(input)
+        res = await self.__query(instruction, prompt)
         extracted_output = self.extract_data_from_generated_response(execution_id+'out-1', res)
         yield extracted_output
     
     async def __get_headers(self):
         return {
             'Content-Type': 'application/json',
-            'Authorization': f"Bearer {self.config.get("apiKey") or Settings.GPT_API_KEY}"
+            'Authorization': f"Bearer {self.config.get("apiKey") or Settings.OPENAI_API_KEY}"
         }
 
-    async def __make_streaming_query(self, input: str):
+    def get_node_text(self, node):
+        return node.data.output.text
+    
+    def parse_prompt(self, input: str):
+        incoming_nodes = self.config.get("incoming_nodes") or []
+        incoming_node_ids = []
+        for node in incoming_nodes:
+            if not (node.id in incoming_node_ids): continue
+            text = self.get_node_text(node)
+        return text
+
+    async def __make_streaming_query(self, instructions: str, prompt: str):
         url = "https://api.openai.com/v1/responses"
         payload = {
             "model": "gpt-3.5-turbo-0125",
-            "instructions": self.config.get("instructions") or 
-                            "You are a helpful assistant, respond politely with appropriate response",
-            "input": input,
+            "input": [
+                {
+                    "role": "developer",
+                    "content": instructions or 
+                            "You are a helpful assistant, respond politely with appropriate response"
+                },
+                {
+                    "role": "user",
+                    "content": prompt or ""
+                }
+            ],
             "stream": True
         }
 
@@ -122,13 +141,21 @@ class GPT_3_5_Turbo(Node):
                         except json.JSONDecodeError:
                             continue
 
-    async def __query(self, input: str):
+    async def __query(self, instructions: str, prompt: str):
         url = "https://api.openai.com/v1/responses"
         payload = {
             "model": "gpt-3.5-turbo-0125",
-            "instructions": self.config.get("instructions") or 
-                            "You are a helpful assistant, respond politely with appropriate response",
-            "input": input,
+            "input": [
+                {
+                    "role": "developer",
+                    "content": instructions or 
+                            "You are a helpful assistant, respond politely with appropriate response"
+                },
+                {
+                    "role": "user",
+                    "content": prompt or ""
+                }
+            ],
             "stream": False
         }
 

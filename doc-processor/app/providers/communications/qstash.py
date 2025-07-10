@@ -25,7 +25,7 @@ class QSTASH_PROVIDER(BASE_COMMUNICATIONS_PROVIDER):
                 message="Invalid \"to\" address",
                 status_code=StatusCode.BAD_REQUEST
             )
-        if Settings.ENV[0] != "local":
+        if Settings.ENV != "local":
             self._client.message.publish_json(
                 url=service_event_url,
                 body=message,
