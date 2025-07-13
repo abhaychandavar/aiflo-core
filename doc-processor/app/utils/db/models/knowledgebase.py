@@ -7,7 +7,7 @@ class KnowledgeBaseType(Enum):
         SEQUENTIAL = 'sequential'
 
 class KnowledgeBase(CustomDocument):
-    refID = StringField(required=True, unique=True)
+    refID = StringField(required=True)
     key = StringField(required=True)
     size = FloatField(required=True)
     fileExt = StringField(required=True)
@@ -17,5 +17,6 @@ class KnowledgeBase(CustomDocument):
     uploadedAt = DateTimeField()
     processedAt = DateTimeField()
     type = EnumField(KnowledgeBaseType)
+    deletedAt = DateTimeField()
     createdAt = DateTimeField(default=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None))
     updatedAt = DateTimeField(default=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None))

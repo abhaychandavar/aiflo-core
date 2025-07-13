@@ -4,7 +4,8 @@ from app.controller.storage import (
     generate_sequential_upload_signed_urls, 
     complete_upload, 
     get_files,
-    get_file_ref_id
+    get_file_ref_id,
+    delete_document
 )
 from app.utils.api import api_helpers 
 from app.utils.api import APP_ERROR
@@ -60,6 +61,20 @@ async def get_file_ref_id_route(request: Request):
         res = get_file_ref_id(
             file_name=body.get("fileName"),
             space_id=space_id
+        );
+        return api_helpers.response_handler(res)
+    except (Exception, APP_ERROR) as e:
+        print("error", e)
+        return api_helpers.response_handler(None, e)
+
+@router.delete("/spaces/{space_id}/documents/{key}")
+async def delete_doc_route(request: Request):
+    try:
+        space_id = request.path_params.get("space_id")
+        key = request.path_params.get("key")
+        res = delete_document(
+            space_id=space_id,
+            key=key
         );
         return api_helpers.response_handler(res)
     except (Exception, APP_ERROR) as e:

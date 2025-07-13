@@ -74,7 +74,8 @@ class KnowledgeBase(BaseNode):
             type=type, 
             generate_dense_vectors=embeddings.embed, 
             generate_sparse_vectors=sparse_embeddings.embed,
-            doc_ids=self.config.get("docIds")
+            doc_ids=self.config.get("docIds"),
+            space_id=self.config.get("spaceID")
         )
         
         res = node_instance.execute()

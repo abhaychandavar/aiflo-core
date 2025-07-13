@@ -11,9 +11,8 @@ async def index(request: Request):
     try:
         body = await request.json();
         file_path = body.get("filePath")
-        mode = body.get("mode")
         max_characters = body.get("maxCharacters")
-        res = await index_doc(doc_path=file_path, mode=mode, max_characters=max_characters, metadata=body.get("metadata"));
+        res = await index_doc(doc_path=file_path, max_characters=max_characters, metadata=body.get("metadata"));
         return api_helpers.response_handler(res)
     except (Exception, APP_ERROR) as e:
         print("error", e)

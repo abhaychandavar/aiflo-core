@@ -24,7 +24,7 @@ from app.providers.embeddings.openAIEmbeddings import OpenAIEmbeddings
 from app.providers.embeddings.fastEmbedEmbeddings import FastEmbeddings
 from app.types.splitMode import SplitMode
 
-async def index_doc(doc_path: str, mode: str, max_characters: int, metadata: dict):
+async def index_doc(doc_path: str, max_characters: int, metadata: dict):
     bucket = Constants.S3.BUCKETS.AIFLO_PUBLIC
     storage_instance = Storage()
     all_folder_keys = storage_instance.get_sorted_file_keys(bucket, doc_path)
@@ -36,7 +36,7 @@ async def index_doc(doc_path: str, mode: str, max_characters: int, metadata: dic
             file_data = storage_instance.get_file(bucket, key)
             match file_ext:
                 case '.pdf':
-                    await index_pdf(file_data, mode, max_characters=max_characters, additional_metadata=metadata)
+                    await index_pdf(file_data, max_characters=max_characters, additional_metadata=metadata)
                     pass
                 case '.txt':
                     # process_text(file_data)
@@ -70,7 +70,8 @@ async def get_pdf_bytes_as_markdown_text(pdf_bytes: bytes) -> str:
         raise
     return extracted_markdown
 
-async def index_text(text_documents: List[TextDocument], mode, max_characters):
+async def index_text(text_documents: List[TextDocument], max_characters):
+    collection_name = "documents"
     llama_splitter_provider = LLAMAIndexSemanticSplitter(max_characters)
     splitter = Splitter(llama_splitter_provider)
     
@@ -86,22 +87,22 @@ async def index_text(text_documents: List[TextDocument], mode, max_characters):
     sparse_embeddings = Embeddings(provider=fastembed_embeddings_provider)
 
     vector_db_dimensions = embeddings.get_dimensions()
-    vector_db_client.upsert_collection(mode=mode, dense_vector_dimensions=vector_db_dimensions)
+    vector_db_client.upsert_collection(collection_name=collection_name, dense_vector_dimensions=vector_db_dimensions)
 
     text_docs = []
     for text_doc in splits:
         doc: TextDocument = {
             **text_doc,
-            "dense_vectors": embeddings.embed(text_doc.get("text")) if mode in [SplitMode.HYBRID.value, SplitMode.SEMANTIC.value] else None,
-            "sparse_vectors": sparse_embeddings.embed(text_doc.get("text")) if mode in [SplitMode.HYBRID.value, SplitMode.KEYWORDS.value] else None
+            "dense_vectors": embeddings.embed(text_doc.get("text")),
+            "sparse_vectors": sparse_embeddings.embed(text_doc.get("text"))
         }
         text_docs.append(doc)
     
-    vector_db_client.upload(text_docs, mode)
+    vector_db_client.upload(text_docs, collection_name=collection_name)
 
     return True
 
-async def index_pdf(data, mode, max_characters, additional_metadata):
+async def index_pdf(data, max_characters, additional_metadata):
     extracted_data_list = await get_pdf_bytes_as_markdown_text(data)
     print(extracted_data_list)
     extracted_docs = []
@@ -122,7 +123,7 @@ async def index_pdf(data, mode, max_characters, additional_metadata):
 
         extracted_docs.append(page_data)
     
-    await index_text(text_documents=extracted_docs, mode=mode, max_characters=max_characters)
+    await index_text(text_documents=extracted_docs, max_characters=max_characters)
     
     return True
 
@@ -137,32 +138,44 @@ async def _handle_process_document(body):
 
     path = knowledge_base_dict.get("path")
     
-    node = await get_node_by_id(node_id=body.get("nodeID"), flow_id=body.get("flowID"))
-
-    max_characters = 14000 #TODO get max characters from knowledgeBase
-    mode = "hybrid" #TODO get mode from knowledgeBase
+    max_characters = 1500
 
     await index_doc(
         doc_path=path,
         max_characters=max_characters,
-        mode=mode,
         metadata={
             "spaceID": knowledge_base_dict.get("spaceID"),
-            "refID": knowledge_base_dict.get("refID")
+            "key": knowledge_base_dict.get("key")
         }
     )
 
-    KnowledgeBase.objects(id=ObjectId(knowledge_base_dict.get("_id"))).modify(
+    KnowledgeBase.objects(id=ObjectId(knowledge_base_dict.get("id"))).modify(
         set__processedAt=datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None),
-        new=True,
-        upsert=True
+        new=True
     )
+
+async def _handle_delete_document(body):
+    id = body.get("id")
+
+    knowledge_base = KnowledgeBase.objects(id=ObjectId(id)).first()
+    if not knowledge_base:
+        raise APP_ERROR(code="doc-processor/not-found/knowledge-base", status_code=StatusCode.NOT_FOUND, message="Knowledge base not found")
+    
+    knowledge_base_obj = knowledge_base.to_dict()
+    quadrant_db_provider = Quadrant(os.environ['QUADRANT_NODE_URL'], os.environ['QUADRANT_API_KEY'])
+    vector_db_client = VectorDb(provider=quadrant_db_provider)
+    vector_db_client.delete_document(collection_name="documents", space_id=knowledge_base_obj.get("spaceID"), key=knowledge_base_obj.get("key"))
+    
+    KnowledgeBase.objects(id=ObjectId(id)).delete()
+    
+    return True
 
 async def handle_event(message):
     body = message.get("body")
     action = message.get("action")
     switcher = {
-        "process-document": _handle_process_document
+        "process-document": _handle_process_document,
+        "delete-document": _handle_delete_document
     }
     await switcher[action](body=body)
-    return True
+    return True  

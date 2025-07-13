@@ -78,7 +78,8 @@ async def get_allowed_llm_models_req(request: Request):
 async def run(request: Request):
     try:
         flow_id = request.path_params.get("flow_id")
+        space_id = request.path_params.get("space_id")
         body = await request.json()
-        return StreamingResponse(run_flow(flow_id, body), media_type="text/event-stream")
+        return StreamingResponse(run_flow(flow_id, body, space_id), media_type="text/event-stream")
     except (Exception, APP_ERROR) as e:
         return api_helpers.response_handler(None, e)

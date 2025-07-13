@@ -121,3 +121,28 @@ class Storage:
                 break
 
         return total_size
+
+    def delete_file(self, bucket: str, key: str) -> bool:
+        """
+        Deletes a file from S3.
+        
+        Args:
+            bucket (str): The name of the S3 bucket.
+            key (str): The path (key) of the file in the bucket.
+        
+        Returns:
+            bool: True if deletion was successful, False otherwise.
+        
+        Raises:
+            APP_ERROR: If deletion fails with custom error message.
+        """
+        try:
+            self._client.delete_object(Bucket=bucket, Key=key)
+            return True
+        except ClientError as e:
+            print(f"Error deleting {key} from {bucket}: {e}")
+            raise APP_ERROR(
+                status_code=StatusCode.SOMETHING_WENT_WRONG,
+                code="docProcessor/storage/delete-failed",
+                message=f"Could not delete file: {str(e)}"
+            )

@@ -72,12 +72,12 @@ class NodeBuilder:
         
         return incoming_nodes
 
-    def build(self):
+    def build(self, space_id: str):
         start_node, _ = self.__get_start_and_end_nodes()
         tree_root_node = Node(start_node.get("id"))
         self.node_tree = tree_root_node
         node_exec_state = NodeExecState()
-        self.__build_node_tree(parent_node=tree_root_node, node=start_node, node_exec_state=node_exec_state)
+        self.__build_node_tree(parent_node=tree_root_node, node=start_node, node_exec_state=node_exec_state, space_id=space_id)
     
     async def execute(self):
         node_state = NodeExecState()
@@ -114,7 +114,7 @@ class NodeBuilder:
             async for result in self.__node_tree_executor(childNode, node_state, execRes):
                 yield result
 
-    def __build_node_tree(self, parent_node: Node, node, node_exec_state, depth = 0):
+    def __build_node_tree(self, parent_node: Node, node, node_exec_state, space_id: str, depth = 0):
         target_nodes = (self.__get_target_nodes(node) or []) if node.get("type") != NodeTypeEnum.END_NODE else []
         next_node_type = None
         if len(target_nodes) == 1:
@@ -129,7 +129,8 @@ class NodeBuilder:
             node=node, 
             is_next_node_output=next_node_type == NodeTypeEnum.END_NODE, 
             incoming_nodes=incoming_nodes,
-            node_exec_state_instance=node_exec_state
+            node_exec_state_instance=node_exec_state,
+            space_id=space_id
         )
         parent_node.set_exec_func(node_exec)
         
@@ -138,14 +139,15 @@ class NodeBuilder:
             
             parent_node.then(child_node)
             
-            self.__build_node_tree(parent_node=child_node, node=target_node, depth=depth+1, node_exec_state=node_exec_state)
+            self.__build_node_tree(parent_node=child_node, node=target_node, depth=depth+1, node_exec_state=node_exec_state, space_id=space_id)
     
-    def __get_node_exec(self, node, is_next_node_output, incoming_nodes: dict, node_exec_state_instance: NodeExecState) -> BaseNode:
+    def __get_node_exec(self, node, is_next_node_output, incoming_nodes: dict, node_exec_state_instance: NodeExecState, space_id: str) -> BaseNode:
         if not node.get("id"):
             raise AttributeError("Node is missing required attribute 'id'")
 
         node_config = node.get("data", {}).get("config", {})
         node_config["streamData"] = node_config.get("config", {}).get("streamData") or is_next_node_output or False
+        node_config["spaceID"] = space_id
 
         if not node.get('type'):
             raise AttributeError("Node is missing required attribute 'type'")

@@ -95,7 +95,7 @@ async def delete_flow(flowID: str):
     delete_res = Flows.objects(id=ObjectId(flowID)).delete()
     return delete_res
 
-async def run_flow(flowID: str, data: dict):
+async def run_flow(flowID: str, data: dict, space_id: str):
     flow = Flows.objects(id=ObjectId(flowID)).first()
 
     if not flow:
@@ -105,7 +105,7 @@ async def run_flow(flowID: str, data: dict):
     edges = data["edges"]
 
     node_tree_builder = NodeBuilder(nodes, edges, flowID)
-    node_tree_builder.build()
+    node_tree_builder.build(space_id=space_id)
 
     run_id = str(uuid4())
 
