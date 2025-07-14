@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from qdrant_client import QdrantClient
 from qdrant_client.models import PointStruct, SparseVector, Distance, VectorParams, SparseVectorParams, Filter, FieldCondition, MatchValue, PointIdsList
 from typing import List
@@ -33,8 +34,7 @@ class Quadrant:
         print(f"Collection created")
 
     def upload(self, documents: List[TextDocument], collection_name: str):
-        points = []
-        for doc in documents:
+        def make_point(doc):
             dense_vectors = doc.get("dense_vectors")
             sparse_vectors = doc.get("sparse_vectors")
             text = doc.get("text")
@@ -42,31 +42,38 @@ class Quadrant:
             id = doc.get("id")
 
             vector = {}
-
             if sparse_vectors:
                 vector["text-sparse"] = SparseVector(
-                            indices=sparse_vectors["indices"],
-                            values=sparse_vectors["values"]
-                        )
+                    indices=sparse_vectors["indices"],
+                    values=sparse_vectors["values"]
+                )
             if dense_vectors:
                 vector["text-dense"] = dense_vectors.get("vectors")
 
-            point = PointStruct(
+            return PointStruct(
                 id=id,
                 vector=vector,
                 payload={"text": text, **metadata}
             )
-            
-            points.append(point)
 
-            if len(points) >= 10:
-                self.client.upsert(collection_name=collection_name, points=points)
-                points = []
+        def chunkify(lst, size):
+            return [lst[i:i + size] for i in range(0, len(lst), size)]
 
-        if len(points):
-            self.client.upsert(collection_name=collection_name, points=points)
-        
-        print(f"Uploaded {len(points)}")
+        points = [make_point(doc) for doc in documents]
+        batches = chunkify(points, 20)
+
+        def upsert_batch(batch):
+            self.client.upsert(collection_name=collection_name, points=batch)
+            return len(batch)
+
+        total_uploaded = 0
+        with ThreadPoolExecutor() as executor:
+            futures = [executor.submit(upsert_batch, batch) for batch in batches]
+            for future in as_completed(futures):
+                uploaded = future.result()
+                total_uploaded += uploaded
+
+        print(f"Uploaded {total_uploaded}")
         
 
     def delete_document(self, collection_name: str, space_id: str, key: str):

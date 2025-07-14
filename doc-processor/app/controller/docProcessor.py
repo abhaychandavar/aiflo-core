@@ -89,14 +89,35 @@ async def index_text(text_documents: List[TextDocument], max_characters):
     vector_db_dimensions = embeddings.get_dimensions()
     vector_db_client.upsert_collection(collection_name=collection_name, dense_vector_dimensions=vector_db_dimensions)
 
+    from concurrent.futures import ThreadPoolExecutor
+    from itertools import islice
+
+    def process_batch(batch, embeddings, sparse_embeddings):
+        batch_docs = []
+        for text_doc in batch:
+            doc: TextDocument = {
+                **text_doc,
+                "dense_vectors": embeddings.embed(text_doc.get("text")),
+                "sparse_vectors": sparse_embeddings.embed(text_doc.get("text"))
+            }
+            batch_docs.append(doc)
+        return batch_docs
+
     text_docs = []
-    for text_doc in splits:
-        doc: TextDocument = {
-            **text_doc,
-            "dense_vectors": embeddings.embed(text_doc.get("text")),
-            "sparse_vectors": sparse_embeddings.embed(text_doc.get("text"))
-        }
-        text_docs.append(doc)
+    batch_size = 10  # Process 10 documents at a time
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        # Create batches of documents
+        batches = [list(islice(splits, i, i + batch_size)) 
+                  for i in range(0, len(splits), batch_size)]
+        
+        # Process batches in parallel
+        futures = [executor.submit(process_batch, batch, embeddings, sparse_embeddings) 
+                  for batch in batches]
+        
+        # Collect results
+        for future in futures:
+            text_docs.extend(future.result())
     
     vector_db_client.upload(text_docs, collection_name=collection_name)
 
@@ -104,7 +125,6 @@ async def index_text(text_documents: List[TextDocument], max_characters):
 
 async def index_pdf(data, max_characters, additional_metadata):
     extracted_data_list = await get_pdf_bytes_as_markdown_text(data)
-    print(extracted_data_list)
     extracted_docs = []
     for data in extracted_data_list:
         metadata = data.get("metadata", {})
