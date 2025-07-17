@@ -11,6 +11,7 @@ class NodeTypeEnum():
     IMAGE_OUTPUT = 'imageOutput'
     LLM_NODE = 'llm'
     KNOWLEDGE_BASE = 'knowledgeBase'
+    FLOW = 'flow' 
 
 NodeType = Literal["start", "res", "llm", "knowledgeBase", "textOutput", "imageOutput"]
 OutputType = Literal["text"]

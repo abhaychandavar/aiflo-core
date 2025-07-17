@@ -9,6 +9,7 @@ from uuid import uuid4
 from app.config.llms import SUPPORTED_LLMS
 from app.config.nodes import NODES_GROUP_LAYOUT
 from app.utils.db.models.project import Projects
+from app.utils.flow import get_flow_by_id as get_flow_by_id_util
 
 def create_flow(user: dict, flow: Optional[dict], name: str, status: str, description: str, project_id: str, type: str):
     user_id = user.get("id")
@@ -66,7 +67,7 @@ async def get_flow(flowID: str):
         return flow_doc.to_dict()
     return None
 
-async def get_flows(user: dict, project_id: str, page = 1, minimal = False):
+async def get_flows(user: dict, project_id: str, search: str, page = 1, minimal = False):
     user_id = user.get("id")
     logging.debug(f"Getting flows for user {user_id}")
     project = Projects.objects(id=ObjectId(project_id), user=ObjectId(user_id)).first()
@@ -77,7 +78,14 @@ async def get_flows(user: dict, project_id: str, page = 1, minimal = False):
     if page < 1:
         page = 1
     skip = (page - 1) * limit
-    base_query = Flows.objects(project=ObjectId(project_id))
+
+    query_params = {"project": ObjectId(project_id)}
+    if search:
+        query_params["name__icontains"] = search
+
+    logging.debug(f"query params {query_params}")
+    
+    base_query = Flows.objects(**query_params)
     total_count = base_query.count()
 
     if minimal:
@@ -104,8 +112,8 @@ async def run_flow(flowID: str, data: dict, space_id: str):
     nodes = data["nodes"]
     edges = data["edges"]
 
-    node_tree_builder = NodeBuilder(nodes, edges, flowID)
-    node_tree_builder.build(space_id=space_id)
+    node_tree_builder = NodeBuilder(nodes, edges, flowID, space_id=space_id)
+    node_tree_builder.build()
 
     run_id = str(uuid4())
 
@@ -122,6 +130,10 @@ def get_node_by_id(flow_id: str, node_id: str, unique_node_id: str):
     flow_dict = flow.to_dict()
     node = next((n for n in flow_dict.get("flow", {}).get("nodes", []) if (node_id and n.get("id") == node_id) or (unique_node_id and n.get("data", {}).get("uniqueIdentifier"))), None)
     return node
+
+def get_flow_by_id(flow_id: str):
+    flow_dict = get_flow_by_id_util(flow_id)
+    return flow_dict
 
 def get_allowed_llm_models():
     llm_objs = SUPPORTED_LLMS.get_models_dict()

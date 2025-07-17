@@ -7,10 +7,11 @@ DictFunction = Union[
 ]
 
 class Node:
-    def __init__(self, id: str):
+    def __init__(self, id: str, type: str):
         self.id = id
         self.__then: List['Node'] = []
         self.exec: DictFunction
+        self.type = type
 
     def print(self):
         self.__print(self, depth=0)

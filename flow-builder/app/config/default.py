@@ -13,5 +13,10 @@ class Settings():
     JWT_SECRET_KEY=os.getenv("JWT_SECRET_KEY", "ALJSDh32re3rR#$RTEw(&*(rhe))")
     INTERNAL_SECRET_KEY=os.getenv("INTERNAL_SECRET_KEY", "secretKey")
     ABLY_API_KEY=os.getenv("ABLY_API_KEY")
+    SERVICES={
+        "flows": {
+            "base-url": os.getenv("FLOWS_SERVICE_BASE_URL", "http://localhost:8080")
+        }
+    }
 
 settings = Settings()

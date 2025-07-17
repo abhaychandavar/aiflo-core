@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Request
-from app.controller.flow import get_node_by_id
+from app.controller.flow import get_node_by_id, get_flow_by_id
 from app.utils.api import APP_ERROR, api_helpers
 
 router = APIRouter()
@@ -11,6 +11,15 @@ async def get_config(request: Request):
         node_id = request.path_params.get("nodeID")
         unique_node_id = request.query_params.get("uniqueNodeId")
         res = get_node_by_id(flow_id=flow_id, node_id=node_id, unique_node_id=unique_node_id)
+        return api_helpers.response_handler(res)
+    except (Exception, APP_ERROR) as e:
+        return api_helpers.response_handler(None, e)
+
+@router.get("/{flow_id}")
+async def get_flow_by_id_route(request: Request):
+    try:
+        flow_id = request.path_params.get("flow_id")
+        res = get_flow_by_id(flow_id=flow_id)
         return api_helpers.response_handler(res)
     except (Exception, APP_ERROR) as e:
         return api_helpers.response_handler(None, e)

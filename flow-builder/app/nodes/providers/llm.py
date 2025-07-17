@@ -46,7 +46,7 @@ class LLMProvider(BaseNode):
         
         node_instance = node_instance(self.config)
 
-        stream_data = self.config.get("streamData") == True
+        stream_data = (self.config.get("isDataStreamingAllowed") == True) and (self.config.get("streamData", False))
 
         raw_prompt = self.config.get("prompt")
         instructions = self.config.get("instructions")

@@ -11,6 +11,7 @@ from app.nodes.providers.startNode import StartNodeProvider
 from app.nodes.providers.resultNode import ResultNodeProvider
 from app.nodes.providers.llm import LLMProvider
 from app.nodes.providers.knowledgeBase import KnowledgeBase
+from app.nodes.providers.flow import Flow
 
 from app.services.aiFloRealtime import AIFloRealtime
 from app.services.aiFloRealtime import Message_Type
@@ -18,11 +19,12 @@ from app.services.aiFloRealtime import Message_Type
 from app.nodes.state.nodeExecState import NodeExecState
 
 class NodeBuilder:
-    def __init__(self, nodes: List[dict], edges: List[dict], flow_id: str):
+    def __init__(self, nodes: List[dict], edges: List[dict], flow_id: str, space_id: str):
         self.flow_id = flow_id
         self.nodes = nodes
         self.edges = edges
         self.node_tree: Node = None
+        self.__space_id = space_id
     
     def get_incoming_nodes(self, node, incoming_nodes=None, nodes_map=None, seen_nodes=None):
         """
@@ -72,49 +74,110 @@ class NodeBuilder:
         
         return incoming_nodes
 
-    def build(self, space_id: str):
+    def build(self):
         start_node, _ = self.__get_start_and_end_nodes()
-        tree_root_node = Node(start_node.get("id"))
+        tree_root_node = Node(start_node.get("id"), start_node.get("type"))
         self.node_tree = tree_root_node
         node_exec_state = NodeExecState()
-        self.__build_node_tree(parent_node=tree_root_node, node=start_node, node_exec_state=node_exec_state, space_id=space_id)
+        self.__build_node_tree(parent_node=tree_root_node, node=start_node, node_exec_state=node_exec_state, space_id=self.__space_id, flow_id=self.flow_id)
     
-    async def execute(self):
+    async def execute(self, only_result=False):
         node_state = NodeExecState()
         if not self.node_tree:
             raise Exception('Build the tree by calling "build" method first.')
-        async for val in self.__node_tree_executor(node=self.node_tree, node_state=node_state):
+        async for val in self.__node_tree_executor(node=self.node_tree, node_state=node_state, only_result=only_result):
             yield val
-    
-    async def __node_tree_executor(self, node: Node, node_state: NodeExecState, data={}):
+
+    async def __node_tree_executor(
+        self,
+        node: Node,
+        node_state: NodeExecState,
+        data=None,
+        *,
+        only_result: bool = False,
+    ):
+        """
+        Depth-first async traversal of a node tree.
+
+        Parameters
+        ----------
+        node : Node
+            Current node to execute.
+        node_state : NodeExecState
+            Execution state (not shown; presumably holds context).
+        data : Any, optional
+            Input payload passed to `node.exec`. Defaults to {} (changed to None in signature
+            to avoid the mutable-default trap; see below).
+        only_result : bool, default False
+            - False: yield every node's execution result (original behavior).
+            - True: yield **only leaf node** results (nodes with no `then` children).
+
+        Yields
+        ------
+        Any
+            Execution results from nodes per `only_result` rule.
+        """
+        if data is None:
+            data = {}
+
         then_list = node.get_then()
+        has_children = bool(then_list)
+
+        # Helper to recurse into children
+        async def _recurse_children(execRes):
+            for childNode in then_list:
+                async for result in self.__node_tree_executor(
+                    childNode, node_state, execRes, only_result=only_result
+                ):
+                    yield result
+
+        # -- CASES: coroutine, async-gen, sync-gen, sync callable -----------------
         if inspect.iscoroutinefunction(node.exec):
             execRes = await node.exec(data)
+
+            # Yield current node result only if not suppressing intermediates
+            if (not only_result) or (not has_children):
+                yield execRes
+
+            if has_children:
+                async for r in _recurse_children(execRes):
+                    yield r
+            return
+
         elif inspect.isasyncgenfunction(node.exec):
             async for execRes in node.exec(data):
-                for childNode in then_list:
-                    async for result in self.__node_tree_executor(childNode, node_state, execRes):
-                        yield result
+                # Same suppression rule applies to each produced value
+                if (not only_result) or (not has_children):
+                    yield execRes
+
+                if has_children:
+                    async for r in _recurse_children(execRes):
+                        yield r
             return
+
         elif inspect.isgeneratorfunction(node.exec):
             for execRes in node.exec(data):
-                for childNode in then_list:
-                    async for result in self.__node_tree_executor(childNode, node_state, execRes):
-                        yield result
+                if (not only_result) or (not has_children):
+                    yield execRes
+
+                if has_children:
+                    async for r in _recurse_children(execRes):
+                        yield r
             return
+
         else:
             execRes = node.exec(data)
 
-        yield execRes
+            if (not only_result) or (not has_children):
+                yield execRes
 
-        if not then_list:
+            if has_children:
+                async for r in _recurse_children(execRes):
+                    yield r
             return
 
-        for childNode in then_list:
-            async for result in self.__node_tree_executor(childNode, node_state, execRes):
-                yield result
 
-    def __build_node_tree(self, parent_node: Node, node, node_exec_state, space_id: str, depth = 0):
+    def __build_node_tree(self, parent_node: Node, node, node_exec_state, space_id: str, flow_id: str, depth = 0):
         target_nodes = (self.__get_target_nodes(node) or []) if node.get("type") != NodeTypeEnum.END_NODE else []
         next_node_type = None
         if len(target_nodes) == 1:
@@ -135,18 +198,18 @@ class NodeBuilder:
         parent_node.set_exec_func(node_exec)
         
         for target_node in target_nodes:
-            child_node = Node(target_node.get("id"))
+            child_node = Node(target_node.get("id"), target_node.get("type"))
             
             parent_node.then(child_node)
             
-            self.__build_node_tree(parent_node=child_node, node=target_node, depth=depth+1, node_exec_state=node_exec_state, space_id=space_id)
+            self.__build_node_tree(parent_node=child_node, node=target_node, node_exec_state=node_exec_state, space_id=space_id, flow_id=flow_id, depth=depth+1)
     
     def __get_node_exec(self, node, is_next_node_output, incoming_nodes: dict, node_exec_state_instance: NodeExecState, space_id: str) -> BaseNode:
         if not node.get("id"):
             raise AttributeError("Node is missing required attribute 'id'")
 
         node_config = node.get("data", {}).get("config", {})
-        node_config["streamData"] = node_config.get("config", {}).get("streamData") or is_next_node_output or False
+        node_config["isDataStreamingAllowed"] = is_next_node_output or False
         node_config["spaceID"] = space_id
 
         if not node.get('type'):
@@ -177,6 +240,15 @@ class NodeBuilder:
                 config=node_config,
                 incoming_nodes=incoming_nodes,
                 node_exec_state_instance=node_exec_state_instance
+            ),
+            NodeTypeEnum.FLOW: lambda: Flow(
+                id=node.get("id"), 
+                config=node_config,
+                incoming_nodes=incoming_nodes,
+                node_exec_state_instance=node_exec_state_instance,
+                space_id=self.__space_id,
+                flow_id=self.flow_id,
+                node_core=NodeBuilder
             ),
         }
 

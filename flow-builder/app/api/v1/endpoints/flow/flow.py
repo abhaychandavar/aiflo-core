@@ -52,7 +52,7 @@ async def get(request: Request):
 async def get_all_flows(request: Request):
     try:
         user = request.state.user
-        res = await get_flows(user, request.path_params.get("project_id"), int(request.query_params.get("page", 1) or 1), request.query_params.get("minimal") == "true");
+        res = await get_flows(user=user, project_id=request.path_params.get("project_id"), page=int(request.query_params.get("page", 1) or 1), minimal=request.query_params.get("minimal") == "true", search=request.query_params.get("search", None));
         return api_helpers.response_handler(res)
     except (Exception, APP_ERROR) as e:
         return api_helpers.response_handler(None, e)
