@@ -3,7 +3,7 @@ from typing import Literal, cast
 import os
 
 class Settings():
-    PROJECT_NAME="flow-builder"
+    PROJECT_NAME="core"
     VERSION="0.0.1"
     HOST=os.getenv("HOST", "localhost")
     PORT=int(os.getenv("PORT", "8080"))

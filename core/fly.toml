@@ -1,5 +1,5 @@
 # fly.toml app configuration file
-app = "aiflo-flow"  # Replace with your desired app name
+app = "aiflo-core"  # Replace with your desired app name
 primary_region = "ams"  # Replace with your preferred region
 
 [build]
